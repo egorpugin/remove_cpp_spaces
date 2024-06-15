@@ -1,0 +1,5 @@
+*.lnk
+*.txt
+*.bat
+.sw
+sw1.cpp
