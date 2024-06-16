@@ -3,20 +3,7 @@
 #include <fstream>
 #include <iostream>
 
-using namespace clang;
-
-void print(auto &&x) {
-    std::cout << x;
-}
-
-struct dump_tokens : PreprocessorFrontendAction {
-    enum class space_type {
-        start_of_file,
-        none,
-        hash,
-        space,
-        newline,
-    };
+struct dump_tokens : clang::PreprocessorFrontendAction {
     enum class prev_line_type {
         no_prev_line,
         normal,
@@ -24,16 +11,14 @@ struct dump_tokens : PreprocessorFrontendAction {
     };
 
     void ExecuteAction() override {
-        Preprocessor &PP = getCompilerInstance().getPreprocessor();
-        SourceManager &SM = PP.getSourceManager();
+        auto &PP = getCompilerInstance().getPreprocessor();
+        auto &SM = PP.getSourceManager();
 
-        // Start lexing the specified input file.
         llvm::MemoryBufferRef FromFile = SM.getBufferOrFake(SM.getMainFileID());
-        Lexer RawLex(SM.getMainFileID(), FromFile, SM, PP.getLangOpts());
+        clang::Lexer RawLex(SM.getMainFileID(), FromFile, SM, PP.getLangOpts());
         RawLex.SetKeepWhitespaceMode(true);
 
-        Token t;
-        space_type space{};
+        clang::Token t;
         prev_line_type prev_line{};
         char prev_sym{};
         auto print_newline = [&](char c) {
@@ -42,7 +27,7 @@ struct dump_tokens : PreprocessorFrontendAction {
                 return;
             }
             prev_sym = c;
-            print(c);
+            std::cout << c;
         };
         while (1) {
             RawLex.LexFromRawLexer(t);
@@ -50,10 +35,10 @@ struct dump_tokens : PreprocessorFrontendAction {
                 continue;
             }
             switch (t.getKind()) {
-            case tok::eof:
+            case clang::tok::eof:
                 return;
-            case tok::comment:
-            case tok::unknown:
+            case clang::tok::comment:
+            case clang::tok::unknown:
                 if (PP.getSpelling(t).contains('\n')) {
                     if (prev_line == prev_line_type::pp) {
                         print_newline('\n');
@@ -61,7 +46,7 @@ struct dump_tokens : PreprocessorFrontendAction {
                     prev_line = prev_line_type::no_prev_line;
                 }
                 continue;
-            case tok::hash:
+            case clang::tok::hash:
                 if (prev_line == prev_line_type::no_prev_line) {
                     print_newline('\n');
                     prev_line = prev_line_type::pp;
@@ -70,52 +55,10 @@ struct dump_tokens : PreprocessorFrontendAction {
                 if (prev_line == prev_line_type::no_prev_line) {
                     prev_line = prev_line_type::normal;
                 }
-                print(PP.getSpelling(t));
+                std::cout << PP.getSpelling(t);
                 print_newline(' ');
                 continue;
             }
-
-            /*while (!t.is(tok::eof) && (false
-                || t.is(clang::tok::TokenKind::comment)
-                || t.is(clang::tok::TokenKind::unknown)
-                )) {
-                RawLex.LexFromRawLexer(t);
-            }
-            if (t.is(tok::eof)) {
-                break;
-            }
-            if (!t.getFlag(clang::Token::TokenFlags::StartOfLine)) {
-                throw std::runtime_error{"not a line start"};
-            }
-
-            prev_line = t.is(clang::tok::TokenKind::hash) ? prev_line_type::pp : prev_line_type::normal;
-
-            print(PP.getSpelling(t));
-            print(" ");
-            RawLex.LexFromRawLexer(t);
-
-            while (!t.getFlag(clang::Token::TokenFlags::StartOfLine) && !t.is(tok::eof)) {
-                if (false
-                    || t.is(clang::tok::TokenKind::comment)
-                    || t.is(clang::tok::TokenKind::unknown)
-                ) {
-                    RawLex.LexFromRawLexer(t);
-                    continue;
-                }
-                print(PP.getSpelling(t));
-                print(" ");
-                RawLex.LexFromRawLexer(t);
-            }
-            if (t.is(tok::eof)) {
-                break;
-            }
-            if (prev_line == prev_line_type::pp) {
-                print("\n");
-                prev_line = prev_line_type::no_prev_line;
-            }
-            print(PP.getSpelling(t));
-            print(" ");
-            RawLex.LexFromRawLexer(t);*/
         }
     }
 };
